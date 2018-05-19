@@ -1,5 +1,7 @@
 # vrc-invite-bot
 
+[![Build Status](https://travis-ci.org/icewind1991/vrc-invite-bot.svg?branch=master)](https://travis-ci.org/icewind1991/vrc-invite-bot)
+
 VRChat bot to automate sending invites
 
 ## Usage

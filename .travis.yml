@@ -1,0 +1,16 @@
+sudo: required
+services:
+- docker
+install:
+- docker pull ekidd/rust-musl-builder:latest
+script:
+- "./travis-build.sh vrc-invite-bot ${TRAVIS_OS_NAME}"
+deploy:
+  provider: releases
+  api_key:
+    secure: T2AfjKWiIoGZPeaKBYYE4xktRaNaoE/bKqf490SwV88C9uGOxLz4A4+fp/OCqjEJTBFYeG/JopcITxCuWSV4+Ij7Hy4I8vfczaDN/w7yDTmfTegWPvMPurISDVGXvLkogLwHk3+83f3IdObUlAjHuTMWr2Agb3+jncSdDmbs1Z0KvCJhKICLF8nU7/fUQEhUWMYpGlPHj/+VkumocxbX8lnasYxLRDD1Dsfma9Rc14vLz+HFP4J2rcZkWQAZfSXLdFPhR6gYgotOxSywB+BFzUjGVbhYfnFWRqcCo4GGlyQmLhZtO8+AtWn6LwWSuZIcpdP+QHbgRbuUTFBP9WnsbEgPaeDUb4lvRSIYnlyEqxwQD3Il7uHba4uPPadSw0rxe3akHxEto5ZYkV4TVa+ORATWsq/zL/zCLlbze1wF/mZUCDk8WLqFvaF8Ij6VSrq2RCeFRr1mTyYTO1GpUxttTL8n0xZZpHOabebXvckBWIKWC1+orIMBdv9XvPcQlE39FV9ec5F/ol+ev51pYl0n+RmIZdT1F50lX9+pqfjKDci8sUGj35Ahsmtr8YcqKnO0Gf9lsZcbf/7nj/AJufq4wwb27c06v9zI6jTl4wcc+Zh1OBoJJbTaauqozNIs+kimi5WzjE2uZCwtFsYw3LTXv3CXO4Yx9ejVeE56Ay5F01Q=
+  file: vrc-invite-bot-linux
+  skip_cleanup: true
+  on:
+    repo: icewind1991/vrc-invite-bot
+    tags: true
