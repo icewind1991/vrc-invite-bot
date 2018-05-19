@@ -90,7 +90,7 @@ struct Notification {
 
 impl RestPath<String> for Notification {
     fn get_path(target_user_id: String) -> Result<String, Error> {
-        Ok(format!("/api/1/auth/user/{}/notification", target_user_id))
+        Ok(format!("/api/1/user/{}/notification", target_user_id))
     }
 }
 
