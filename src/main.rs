@@ -40,6 +40,7 @@ impl ToString for NotificationType {
     }
 }
 
+#[derive(Serialize, Deserialize, Debug)]
 struct InstanceId {
     world: String,
     instance: String,
@@ -100,6 +101,13 @@ impl RestPath<String> for AcceptFriendRequest {
 }
 
 #[derive(Serialize, Deserialize)]
+struct HideNotification {}
+
+impl RestPath<String> for HideNotification {
+    fn get_path(notification_id: String) -> Result<String, Error> { Ok(format!("/api/1/auth/user/notifications/{}/hide", notification_id)) }
+}
+
+#[derive(Serialize, Deserialize)]
 struct InviteNotification {
     #[serde(rename = "worldId")]
     world_id: String
@@ -133,7 +141,11 @@ impl VrcApi {
         self.client.put(notification_id, &AcceptFriendRequest {})
     }
 
-    pub fn invite_user(&mut self, user_id: String, instance: &InstanceId, message: String) -> Result<(), Error> {
+    pub fn hide_notification(&mut self, notification_id: String) -> Result<(), Error> {
+        self.client.put(notification_id, &HideNotification {})
+    }
+
+    pub fn invite_user(&mut self, user_id: String, instance: InstanceId, message: String) -> Result<(), Error> {
         let invite = InviteNotification {
             world_id: instance.to_string()
         };
@@ -163,6 +175,19 @@ fn accept_all(api: &mut VrcApi) -> Result<(), Error> {
     Ok(())
 }
 
+fn handle_invite_requests(api: &mut VrcApi) -> Result<(), Error> {
+    let result = api.get_notifications(NotificationType::RequestInvite)?;
+    match result {
+        NotificationList::Array(requests) => for request in requests {
+            println!("handling invite request from {}", request.sender_user_name);
+            api.hide_notification(request.id)?;
+            let instance: InstanceId = serde_json::from_str(&request.details).map_err(|_| Error::ParseError)?;
+            api.invite_user(request.sender_user_id, instance, request.message)?
+        }
+    }
+    Ok(())
+}
+
 fn main() {
     let args: Vec<_> = std::env::args().collect();
     if args.len() != 5 {
@@ -171,12 +196,28 @@ fn main() {
         let mut api = VrcApi::new(&args[1], &args[2], &args[3]).unwrap();
 
         let mode = args[4].to_string();
+
+        let five_seconds = time::Duration::from_secs(5);
+
         match &*mode {
             "accept" => {
-                let five_seconds = time::Duration::from_secs(5);
                 loop {
-                    accept_all(&mut api);
-                    thread::sleep(five_seconds)
+                    let result = accept_all(&mut api);
+                    match result {
+                        Err(e) => println!("error while running loop {:?}", e),
+                        Ok(_) => {}
+                    }
+                    thread::sleep(five_seconds);
+                }
+            }
+            "invite" => {
+                loop {
+                    let result = handle_invite_requests(&mut api);
+                    match result {
+                        Err(e) => println!("error while running loop {:?}", e),
+                        Ok(_) => {}
+                    }
+                    thread::sleep(five_seconds);
                 }
             }
             mode => println!("unrecognized mode {}, supported modes: accept, invite", mode)
