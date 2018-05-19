@@ -1,5 +1,5 @@
 [package]
-name = "vrcapi-rust"
+name = "vrc-invite-bot"
 version = "0.1.0"
 authors = ["Robin Appelman <robin@icewind.nl>"]
 

@@ -1,26 +1,28 @@
 extern crate hyper;
+extern crate log;
 extern crate restson;
 extern crate serde;
 #[macro_use]
 extern crate serde_derive;
 extern crate serde_json;
-extern crate log;
 extern crate simple_logger;
 
 use hyper::header::Cookie;
 use restson::{Error, RestClient, RestPath};
+use std::{thread, time};
 
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all = "lowercase")]
 enum NotificationType {
     All,
     Message,
+    #[serde(rename = "friendRequest")]
     FriendRequest,
     Invite,
     VoteToKick,
     Help,
     Hidden,
-    RequestInvite
+    RequestInvite,
 }
 
 impl ToString for NotificationType {
@@ -28,13 +30,24 @@ impl ToString for NotificationType {
         match *self {
             NotificationType::All => "all".to_string(),
             NotificationType::Message => "message".to_string(),
-            NotificationType::FriendRequest => "friendrequest".to_string(),
-            NotificationType::Invite => "invitemessage".to_string(),
+            NotificationType::FriendRequest => "friendRequest".to_string(),
+            NotificationType::Invite => "invite".to_string(),
             NotificationType::VoteToKick => "votetokick".to_string(),
             NotificationType::Help => "help".to_string(),
             NotificationType::Hidden => "hidden".to_string(),
             NotificationType::RequestInvite => "requestinvite".to_string(),
         }
+    }
+}
+
+struct InstanceId {
+    world: String,
+    instance: String,
+}
+
+impl ToString for InstanceId {
+    fn to_string(&self) -> String {
+        format!("{}:{}", self.world, self.instance)
     }
 }
 
@@ -65,6 +78,20 @@ impl RestPath<()> for NotificationList {
     }
 }
 
+#[derive(Serialize, Deserialize, Debug)]
+struct Notification {
+    #[serde(rename = "type")]
+    message_type: NotificationType,
+    details: String,
+    message: String,
+}
+
+impl RestPath<String> for Notification {
+    fn get_path(target_user_id: String) -> Result<String, Error> {
+        Ok(format!("/api/1/auth/user/{}/notification", target_user_id))
+    }
+}
+
 #[derive(Serialize, Deserialize)]
 struct AcceptFriendRequest {}
 
@@ -72,16 +99,87 @@ impl RestPath<String> for AcceptFriendRequest {
     fn get_path(notification_id: String) -> Result<String, Error> { Ok(format!("/api/1/auth/user/notifications/{}/accept", notification_id)) }
 }
 
-fn main() {
-//    simple_logger::init().unwrap();
-    let mut client = RestClient::new("https://vrchat.com").unwrap();
-    let mut api_key_cookie = Cookie::new();
-    api_key_cookie.set("apiKey", "JlE5Jldo5Jibnk5O5hTx6XVqsJu4WJ26");
-    client.set_auth("", "");
-    client.set_header(api_key_cookie);
-    let result: Result<NotificationList,restson::Error> = client.get(());
+#[derive(Serialize, Deserialize)]
+struct InviteNotification {
+    #[serde(rename = "worldId")]
+    world_id: String
+}
+
+struct VrcApi {
+    client: RestClient
+}
+
+impl VrcApi {
+    pub fn new(api_key: &str, username: &str, password: &str) -> Result<VrcApi, Error> {
+        let mut client = RestClient::new("https://vrchat.com")?;
+        let mut api_key_cookie = Cookie::new();
+        api_key_cookie.set("apiKey", api_key.to_string());
+        client.set_auth(username, password);
+        client.set_header(api_key_cookie);
+
+        Ok(VrcApi {
+            client
+        })
+    }
+
+    pub fn get_notifications(&mut self, notification_type: NotificationType) -> Result<NotificationList, Error> {
+        match notification_type {
+            NotificationType::All => self.client.get(()),
+            _ => self.client.get_with((), &[("type", &notification_type.to_string())])
+        }
+    }
+
+    pub fn accept_friend_request(&mut self, notification_id: String) -> Result<(), Error> {
+        self.client.put(notification_id, &AcceptFriendRequest {})
+    }
+
+    pub fn invite_user(&mut self, user_id: String, instance: &InstanceId, message: String) -> Result<(), Error> {
+        let invite = InviteNotification {
+            world_id: instance.to_string()
+        };
+        self.send_notification(user_id, NotificationType::Invite, &invite, message)
+    }
+
+    fn send_notification<T: ?Sized>(&mut self, user_id: String, message_type: NotificationType, details: &T, message: String) -> Result<(), Error>
+        where
+            T: serde::Serialize
+    {
+        self.client.post(user_id, &Notification {
+            message_type,
+            details: serde_json::to_string(details).map_err(|_| Error::ParseError)?,
+            message,
+        })
+    }
+}
+
+fn accept_all(api: &mut VrcApi) -> Result<(), Error> {
+    let result = api.get_notifications(NotificationType::FriendRequest)?;
     match result {
-        Err(err) => println!("{:?}", err),
-        Ok(notifications) => println!("{:?}", notifications)
+        NotificationList::Array(requests) => for request in requests {
+            println!("accepting friend request from {}", request.sender_user_name);
+            api.accept_friend_request(request.id)?
+        }
+    }
+    Ok(())
+}
+
+fn main() {
+    let args: Vec<_> = std::env::args().collect();
+    if args.len() != 5 {
+        println!("Usage {} <api_key> <username> <password> <mode>", args[0])
+    } else {
+        let mut api = VrcApi::new(&args[1], &args[2], &args[3]).unwrap();
+
+        let mode = args[4].to_string();
+        match &*mode {
+            "accept" => {
+                let five_seconds = time::Duration::from_secs(5);
+                loop {
+                    accept_all(&mut api);
+                    thread::sleep(five_seconds)
+                }
+            }
+            mode => println!("unrecognized mode {}, supported modes: accept, invite", mode)
+        }
     }
 }

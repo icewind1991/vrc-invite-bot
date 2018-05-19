@@ -790,7 +790,7 @@ version = "0.1.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
-name = "vrcapi-rust"
+name = "vrc-invite-bot"
 version = "0.1.0"
 dependencies = [
  "hyper 0.11.27 (registry+https://github.com/rust-lang/crates.io-index)",
