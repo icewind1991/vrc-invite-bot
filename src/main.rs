@@ -6,6 +6,7 @@ extern crate serde;
 extern crate serde_derive;
 extern crate serde_json;
 extern crate simple_logger;
+extern crate openssl_probe;
 
 use hyper::header::Cookie;
 use restson::{Error, RestClient, RestPath};
@@ -189,6 +190,7 @@ fn handle_invite_requests(api: &mut VrcApi) -> Result<(), Error> {
 }
 
 fn main() {
+    openssl_probe::init_ssl_cert_env_vars();
     let args: Vec<_> = std::env::args().collect();
     if args.len() != 5 {
         println!("Usage {} <api_key> <username> <password> <mode>", args[0])
